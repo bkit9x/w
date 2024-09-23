@@ -1,0 +1,50 @@
+<!-- viết code html đếm ngược đến ngày  16/01/2025 -->
+ <!DOCTYPE html>
+ <html lang="en">
+ <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+        body{
+            display: block;
+            background-color: #000;
+            color: chartreuse;
+        }
+        #demo
+        {
+            text-align: center;
+            margin: auto;
+            margin-top: 50px;
+            font-size: 1.5em;
+        }
+        #demo b{
+            color: red;
+        }
+    </style>
+ </head>
+ <body>
+    <div id="demo"></div>
+ </body>
+ <script>
+    // Set the date we're counting down to
+    var myDate = "16/01/2025";
+    arrMyDate = myDate.split("/");
+    var countDownDate = new Date( arrMyDate[2], arrMyDate[1] - 1, arrMyDate[0]).getTime();
+
+      // Get today's date and time
+      var now = new Date().getTime();
+
+      // Find the distance between now and the count down date
+      var distance = countDownDate - now;
+
+      // Time calculations for days, hours, minutes and seconds
+      var days = Math.floor(distance / (1000 * 60 * 60 * 24));
+
+
+    // Output the result in an element with id="demo"
+      document.getElementById("demo").innerHTML = "Còn <b>" + days + "</b> ngày nữa là đến " + myDate;
+
+  </script>
+</html>  
+  
