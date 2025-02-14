@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="vi">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,8 +8,9 @@
         body {
             font-family: Arial, sans-serif;
             margin: 0;
-            padding: 20px;
             background-color: #f0f0f0;
+            color: #333;
+            font-family: 'Courier New', Courier, monospace;
         }
         h1 {
             text-align: center;
@@ -18,7 +19,7 @@
             width: 100%;
             border-collapse: collapse;
             background-color: #fff;
-            margin-top: 20px;
+            margin-top: 10px;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
         th, td {
@@ -42,7 +43,6 @@
         }
         .add-row, .delete-row {
             display: inline-block;
-            margin-top: 10px;
             padding: 10px 20px;
             background-color: #4CAF50;
             color: white;
@@ -52,10 +52,11 @@
             text-align: center;
             font-size: 16px;
         }
+        .add-row{
+            margin-left: 20px;
+        }
         .delete-row {
-            margin-left: 10px;
             margin-top: 0px;
-
             background-color: #f44336;
         }
         .total {
@@ -75,37 +76,72 @@
             text-align: center;
             font-size: 16px;
         }
+        #export-table{
+            padding: 20px;
+        }
+    @media (max-width: 600px) {
+        #export-table {
+            padding: 5px;
+        }
+        table {
+            font-size: 12px;
+        }
+        th, td {
+            padding: 2px;
+        }
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 5px;
+        }
+        .add-row{
+            margin-left: 5px;
+        }
+
+        .add-row, .delete-row{
+            font-size: 14px;
+            padding: 3px 5px;
+        }
+        .export {
+            padding: 3px 10px;
+        }
+        h1, .total {
+            font-size: 18px;
+        }
+    }
     </style>
 </head>
 <body>
-    <h1>Tính tiền</h1>
+    <div id="export-table">
+        <h1></h1>
+        <table id="table">
+            <thead>
+                <tr>
+                    <th></th>
+                    <th>Loại</th>
+                    <th>Số kí</th>
+                    <th>Giá</th>
+                    <th>Thành tiền</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><button class="delete-row" onclick="deleteRow(this)">-</button></td>
+                    <td><input type="text" name="loai"></td>
+                    <td><input type="number" name="so_ki" oninput="calculateRow(this)"></td>
+                    <td><input type="number" name="gia" oninput="calculateRow(this)"></td>
+                    <td class="thanh_tien">0</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="total">Tổng thành tiền: <span id="tong_thanh_tien">0</span></div>
+    
+    </div>
     <button class="add-row" onclick="addRow()">+</button>
-    <table id="table">
-        <thead>
-            <tr>
-                <th></th>
-                <th>Loại</th>
-                <th>Số kí</th>
-                <th>Giá</th>
-                <th>Thành tiền</th>
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-                <td><button class="delete-row" onclick="deleteRow(this)">-</button></td>
-                <td><input type="text" name="loai"></td>
-                <td><input type="number" name="so_ki" oninput="calculateRow(this)"></td>
-                <td><input type="number" name="gia" oninput="calculateRow(this)"></td>
-                <td class="thanh_tien">0</td>
-            </tr>
-        </tbody>
-    </table>
-    <div class="total">Tổng thành tiền: <span id="tong_thanh_tien">0</span></div>
     <button class="export" onclick="exportTable()">Xuất ra hình ảnh</button>
 
     <script>
         let now = new Date();
-        let timestamp = now.toLocaleDateString('vi-VN').replace(/\//g, '-') + '_' + now.toLocaleTimeString('vi-VN').replace(/:/g, '-');
+        let timestamp = now.toLocaleDateString('vi-VN').replace(/\//g, '-') + ' ' + now.toLocaleTimeString('vi-VN').replace(/:/g, '-');
         document.title = 'Tính tiền ngày' + timestamp;
         document.querySelector('h1').innerHTML = 'Tính tiền ngày ' + timestamp;
         function calculateRow(element) {
@@ -151,7 +187,7 @@
         }
 
         function exportTable() {
-            html2canvas(document.body).then(canvas => {
+            html2canvas(document.getElementById('export-table')).then(canvas => {
                 let link = document.createElement('a');
                 link.href = canvas.toDataURL('image/png');
                 link.download = "tien_" + timestamp + ".png";
