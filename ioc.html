@@ -1,0 +1,1063 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Điều Hành Trung Tâm - Sci-Fi Radial HUD</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:ital,wght@0,400;0,500;0,600;0,700;1,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --cyan-glow: #00f0ff;
+            --blue-hud: #0a84ff;
+            --gold-glow: #ffcf40;
+            --red-badge: #ff2a54;
+            --emerald-glow: #10b981;
+            --bg-dark: #030914;
+        }
+
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: var(--bg-dark);
+            color: #e2f1ff;
+            font-family: 'Chakra Petch', 'Inter', sans-serif;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(12, 45, 87, 0.45) 0%, rgba(4, 12, 26, 0.92) 65%, #02060d 100%),
+                linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+            background-size: 100% 100%, 40px 40px, 40px 40px;
+        }
+
+        /* Scanline & Vignette Overlay */
+        .hud-overlay {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background: 
+                radial-gradient(circle at center, transparent 55%, rgba(0, 5, 12, 0.75) 100%),
+                repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.12) 0px, rgba(0, 0, 0, 0.12) 1px, transparent 1px, transparent 3px);
+            z-index: 40;
+        }
+
+        /* HUD Corner Brackets */
+        .hud-bracket {
+            position: fixed;
+            width: 42px;
+            height: 42px;
+            border-color: rgba(0, 240, 255, 0.35);
+            pointer-events: none;
+            z-index: 30;
+        }
+        .hud-bracket-tl { top: 20px; left: 24px; border-top: 2px solid; border-left: 2px solid; }
+        .hud-bracket-tr { top: 20px; right: 24px; border-top: 2px solid; border-right: 2px solid; }
+        .hud-bracket-bl { bottom: 20px; left: 24px; border-bottom: 2px solid; border-left: 2px solid; }
+        .hud-bracket-br { bottom: 20px; right: 24px; border-bottom: 2px solid; border-right: 2px solid; }
+
+        /* SVG Wheel Styling */
+        #wheel-svg {
+            width: min(88vh, 88vw);
+            height: min(88vh, 88vw);
+            max-width: 900px;
+            max-height: 900px;
+            overflow: visible;
+            filter: drop-shadow(0 0 25px rgba(0, 140, 255, 0.18));
+            transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .wedge-group {
+            cursor: pointer;
+            transition: filter 0.2s ease, opacity 0.25s ease;
+        }
+
+        .wedge-path {
+            fill: rgba(8, 25, 48, 0.72);
+            stroke: rgba(0, 195, 255, 0.38);
+            stroke-width: 1.15;
+            transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .wedge-group.special-green .wedge-path {
+            fill: rgba(6, 42, 40, 0.74);
+            stroke: rgba(16, 185, 129, 0.48);
+        }
+
+        .wedge-group:hover .wedge-path {
+            fill: rgba(16, 52, 95, 0.88);
+            stroke: rgba(0, 240, 255, 0.75);
+        }
+
+        /* Active / Selected Golden Segment (Matches 3rd Reference Image) */
+        .wedge-group.active .wedge-path {
+            fill: url(#goldGradient) !important;
+            stroke: #ffe680 !important;
+            stroke-width: 2.2px !important;
+            filter: url(#goldGlow);
+        }
+
+        .wedge-label {
+            font-family: 'Inter', sans-serif;
+            font-size: 8.6px;
+            font-weight: 500;
+            fill: #bfe6ff;
+            letter-spacing: 0.01em;
+            pointer-events: none;
+            transition: fill 0.18s ease, font-weight 0.18s ease;
+        }
+
+        .wedge-group.special-green .wedge-label {
+            fill: #86efac;
+        }
+
+        .wedge-group.active .wedge-label {
+            fill: #ffffff !important;
+            font-weight: 700 !important;
+            text-shadow: 0 0 8px rgba(255, 215, 0, 0.9);
+        }
+
+        .wedge-num {
+            font-family: 'Chakra Petch', sans-serif;
+            font-size: 9.5px;
+            font-weight: 700;
+            fill: #5ce1e6;
+            pointer-events: none;
+            transition: all 0.18s ease;
+        }
+
+        .wedge-group.special-green .wedge-num {
+            fill: #34d399;
+        }
+
+        .wedge-group.active .wedge-num {
+            fill: #fff7cc !important;
+            font-size: 11px;
+        }
+
+        .wedge-group.dimmed {
+            opacity: 0.22;
+        }
+
+        /* Center Holographic Hub */
+        .holo-core {
+            position: absolute;
+            width: min(26.5vh, 26.5vw);
+            height: min(26.5vh, 26.5vw);
+            max-width: 268px;
+            max-height: 268px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 50% 35%, rgba(16, 68, 122, 0.65) 0%, rgba(5, 18, 38, 0.94) 68%, rgba(2, 8, 18, 0.98) 100%);
+            border: 1.5px solid rgba(0, 225, 255, 0.55);
+            box-shadow: 
+                0 0 30px rgba(0, 195, 255, 0.35),
+                inset 0 0 28px rgba(0, 195, 255, 0.32);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 16px 14px;
+            text-align: center;
+            z-index: 25;
+            overflow: hidden;
+            backdrop-filter: blur(8px);
+        }
+
+        /* Holographic Base Grid inside Center Hub */
+        .holo-stage-rings {
+            position: absolute;
+            bottom: -18px;
+            width: 86%;
+            height: 64px;
+            border-radius: 50%;
+            background: radial-gradient(ellipse at center, rgba(0, 240, 255, 0.42) 0%, rgba(0, 132, 255, 0.12) 55%, transparent 75%);
+            border: 1px solid rgba(0, 240, 255, 0.4);
+            transform: rotateX(72deg);
+            box-shadow: 0 0 18px rgba(0, 240, 255, 0.45);
+            pointer-events: none;
+            animation: pulseHolo 3s infinite ease-in-out;
+        }
+
+        @keyframes pulseHolo {
+            0%, 100% { opacity: 0.75; transform: rotateX(72deg) scale(0.98); }
+            50% { opacity: 1; transform: rotateX(72deg) scale(1.04); }
+        }
+
+        @keyframes spinSlow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .ring-spin-cw {
+            animation: spinSlow 48s linear infinite;
+            transform-origin: 500px 500px;
+        }
+
+        .ring-spin-ccw {
+            animation: spinSlow 64s linear infinite reverse;
+            transform-origin: 500px 500px;
+        }
+
+        /* Custom Scrollbar for Quick List Modal */
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: rgba(4, 15, 30, 0.6); }
+        ::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.4); border-radius: 4px; }
+    </style>
+</head>
+<body class="relative flex items-center justify-center select-none">
+
+    <!-- Background Floating Particles Canvas -->
+    <canvas id="particle-canvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+
+    <!-- Subtle Scanline & Vignette HUD Overlay -->
+    <div class="hud-overlay"></div>
+
+    <!-- 4 Corner HUD Brackets -->
+    <div class="hud-bracket hud-bracket-tl"></div>
+    <div class="hud-bracket hud-bracket-tr"></div>
+    <div class="hud-bracket hud-bracket-bl"></div>
+    <div class="hud-bracket hud-bracket-br"></div>
+
+    <!-- TOP HUD BAR -->
+    <header class="fixed top-4 left-8 right-8 flex flex-wrap items-center justify-between gap-3 z-30 pointer-events-auto">
+        <!-- System Title & Status -->
+        <div class="flex items-center gap-3 bg-[#051329]/80 border border-cyan-500/30 px-3.5 py-2 rounded-lg backdrop-blur-md shadow-[0_0_15px_rgba(0,240,255,0.12)]">
+            <div class="relative flex h-3 w-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-cyan-400 shadow-[0_0_8px_#00f0ff]"></span>
+            </div>
+            <div>
+                <div class="text-[10px] tracking-[0.22em] text-cyan-400/80 uppercase font-semibold">TRUNG TÂM ĐIỀU HÀNH THÔNG MINH</div>
+                <div class="text-xs sm:text-sm font-bold tracking-wider text-white flex items-center gap-2">
+                    <span>RADIAL COMMAND HUD</span>
+                    <span class="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-400/30">30 PHÂN HỆ</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search & Filter Input -->
+        <div class="flex items-center gap-2 flex-1 max-w-md mx-auto">
+            <div class="relative w-full">
+                <input 
+                    id="search-input" 
+                    type="text" 
+                    placeholder="Tìm nhanh phân hệ (VD: 57, GIS, OCOP, 1..30)..." 
+                    class="w-full bg-[#06162d]/85 border border-cyan-500/40 focus:border-amber-400 text-xs sm:text-sm text-cyan-50 placeholder-cyan-300/40 rounded-lg pl-9 pr-16 py-2 outline-none transition shadow-[0_0_15px_rgba(0,240,255,0.1)]"
+                />
+                <svg class="w-4 h-4 text-cyan-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+                </svg>
+                <button id="clear-search" class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] px-1.5 py-0.5 bg-slate-700/80 hover:bg-rose-500/80 text-white rounded transition">
+                    XÓA
+                </button>
+            </div>
+        </div>
+
+        <!-- Mode & Audio Controls -->
+        <div class="flex items-center gap-2">
+            <!-- Filter New Badge -->
+            <button id="btn-filter-new" class="px-3 py-2 rounded-lg text-xs font-semibold border border-rose-500/40 bg-[#1a0919]/80 text-rose-300 hover:bg-rose-500/20 hover:border-rose-400 transition flex items-center gap-1.5 backdrop-blur-md">
+                <span class="w-2 h-2 rounded-full bg-rose-500 shadow-[0_0_8px_#ff2a54]"></span>
+                <span>MỚI (13)</span>
+            </button>
+
+            <!-- Layout Density Mode Toggle -->
+            <button id="btn-view-mode" class="px-3 py-2 rounded-lg text-xs font-semibold border border-cyan-500/40 bg-[#06162d]/80 text-cyan-200 hover:bg-cyan-500/20 hover:border-cyan-300 transition flex items-center gap-1.5 backdrop-blur-md" title="Chuyển chế độ chữ lớn hoặc đầy đủ 30 ô">
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+                </svg>
+                <span id="view-mode-label">CHẾ ĐỘ: 30 Ô CHUẨN</span>
+            </button>
+
+            <!-- Sound FX Toggle -->
+            <button id="btn-sound" class="p-2 rounded-lg border border-cyan-500/40 bg-[#06162d]/80 text-cyan-300 hover:bg-cyan-500/20 transition backdrop-blur-md" title="Bật/Tắt âm thanh HUD Sci-Fi">
+                <svg id="icon-sound-on" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                </svg>
+                <svg id="icon-sound-off" class="w-4 h-4 hidden text-rose-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15zM17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- LEFT HUD TELEMETRY (Decorative & Quick Stats like Reference Image 3) -->
+    <aside class="hidden xl:flex fixed left-7 top-1/2 -translate-y-1/2 flex-col gap-4 z-20 pointer-events-none">
+        <div class="bg-[#041122]/75 border-l-2 border-cyan-400/70 pl-3 pr-4 py-2 backdrop-blur-sm">
+            <div class="text-[10px] text-cyan-400/70 tracking-widest uppercase">PHÂN HỆ ĐANG CHỌN</div>
+            <div id="side-slot-code" class="text-xl font-bold text-amber-400 tracking-wider">SLOT #01 / 30</div>
+            <div id="side-angle-readout" class="text-[11px] text-cyan-300/80 font-mono">GÓC QUÉT: 000.0°</div>
+        </div>
+
+        <div class="bg-[#041122]/75 border-l-2 border-rose-500/70 pl-3 pr-4 py-2 backdrop-blur-sm">
+            <div class="text-[10px] text-rose-300/80 tracking-widest uppercase">CẬP NHẬT MỚI</div>
+            <div class="text-sm font-bold text-white">13 Chuyên đề <span class="text-rose-400">[MỚI]</span></div>
+            <div class="text-[11px] text-slate-400">2 Kho dữ liệu Sở/Xã</div>
+        </div>
+
+        <!-- Paged Group Switcher (Shown when in 10-slice Zoom Mode) -->
+        <div id="group-switcher" class="hidden pointer-events-auto bg-[#061830]/90 border border-amber-400/50 rounded-lg p-2.5 flex-col gap-1.5 shadow-[0_0_20px_rgba(255,207,64,0.15)]">
+            <div class="text-[10px] text-amber-300 font-bold tracking-wider uppercase mb-1">CHỌN VÒNG PHÂN HỆ:</div>
+            <button data-page="0" class="page-btn px-2.5 py-1.5 rounded text-xs font-semibold bg-amber-400 text-slate-950 text-left transition">Nhóm 01 - 10</button>
+            <button data-page="1" class="page-btn px-2.5 py-1.5 rounded text-xs font-semibold bg-slate-800/80 text-cyan-200 hover:bg-cyan-500/20 text-left transition">Nhóm 11 - 20</button>
+            <button data-page="2" class="page-btn px-2.5 py-1.5 rounded text-xs font-semibold bg-slate-800/80 text-cyan-200 hover:bg-cyan-500/20 text-left transition">Nhóm 21 - 30</button>
+        </div>
+    </aside>
+
+    <!-- MAIN RADIAL WEAPON WHEEL CONTAINER -->
+    <main class="relative flex items-center justify-center w-full h-full z-20">
+        
+        <!-- Precision SVG Radial Wheel -->
+        <svg id="wheel-svg" viewBox="0 0 1000 1000" aria-label="Vòng tròn chọn phân hệ">
+            <defs>
+                <!-- Glowing Gold Active Fill Gradient (Exact match to top slot in 3rd reference) -->
+                <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#ffe680" stop-opacity="0.92"/>
+                    <stop offset="45%" stop-color="#f59e0b" stop-opacity="0.68"/>
+                    <stop offset="100%" stop-color="#78350f" stop-opacity="0.82"/>
+                </linearGradient>
+
+                <!-- Glowing Cyan Hover Fill -->
+                <linearGradient id="cyanGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#00f0ff" stop-opacity="0.32"/>
+                    <stop offset="100%" stop-color="#062246" stop-opacity="0.85"/>
+                </linearGradient>
+
+                <!-- Intense Gold Neon Drop Shadow / Glow Filter -->
+                <filter id="goldGlow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="7" result="blur1" />
+                    <feGaussianBlur stdDeviation="16" result="blur2" />
+                    <feMerge>
+                        <feMergeNode in="blur2" />
+                        <feMergeNode in="blur1" />
+                        <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                </filter>
+
+                <!-- Red Neon Badge Glow -->
+                <filter id="redGlow" x="-40%" y="-40%" width="180%" height="180%">
+                    <feGaussianBlur stdDeviation="3.5" result="blur" />
+                    <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                    </feMerge>
+                </filter>
+            </defs>
+
+            <!-- Outer Decorative Sci-Fi HUD Rings -->
+            <g class="ring-spin-cw" opacity="0.55">
+                <circle cx="500" cy="500" r="452" fill="none" stroke="#00f0ff" stroke-width="1" stroke-dasharray="4 14 28 14" />
+                <circle cx="500" cy="500" r="460" fill="none" stroke="#0a84ff" stroke-width="1.5" stroke-dasharray="90 180" />
+            </g>
+            <g class="ring-spin-ccw" opacity="0.4">
+                <circle cx="500" cy="500" r="444" fill="none" stroke="#38bdf8" stroke-width="1.2" stroke-dasharray="2 8" />
+            </g>
+
+            <!-- Fixed Outer Rim Bezel -->
+            <circle cx="500" cy="500" r="434" fill="none" stroke="rgba(0, 225, 255, 0.55)" stroke-width="2" />
+            <circle cx="500" cy="500" r="428" fill="none" stroke="rgba(0, 225, 255, 0.2)" stroke-width="1" />
+
+            <!-- Dynamic Radial Wedges Group -->
+            <g id="wedges-container"></g>
+
+            <!-- Inner Ring Framing around Holographic Core -->
+            <circle cx="500" cy="500" r="168" fill="none" stroke="rgba(0, 240, 255, 0.65)" stroke-width="2.2" />
+            <circle cx="500" cy="500" r="158" fill="none" stroke="rgba(0, 240, 255, 0.25)" stroke-width="1" stroke-dasharray="10 6" />
+
+            <!-- Inner Golden Pointer Arrow (Rotates smoothly to point at selected wedge like 3rd image) -->
+            <g id="selection-pointer" transform="rotate(0, 500, 500)">
+                <polygon 
+                    points="500,322 491,340 500,335 509,340" 
+                    fill="#ffdf4d" 
+                    stroke="#ffffff" 
+                    stroke-width="1"
+                    filter="url(#goldGlow)"
+                />
+                <!-- Outer Gold Highlight Arc Cap -->
+                <path 
+                    id="outer-highlight-cap"
+                    d="M 465 68 A 434 434 0 0 1 535 68" 
+                    fill="none" 
+                    stroke="#ffe680" 
+                    stroke-width="4.5" 
+                    stroke-linecap="round"
+                    filter="url(#goldGlow)"
+                />
+            </g>
+        </svg>
+
+        <!-- CENTRAL HOLOGRAPHIC CORE (Matches 3rd Reference Image with UG Logo + Live Item Readout) -->
+        <div class="holo-core">
+            <!-- Top Emblem & Badge Row -->
+            <div class="flex flex-col items-center w-full z-10">
+                <div class="flex items-center gap-1.5 mb-1">
+                    <span id="core-item-number" class="px-2 py-0.5 rounded text-[11px] font-extrabold bg-amber-400/20 text-amber-300 border border-amber-400/50 shadow-[0_0_10px_rgba(255,207,64,0.3)]">
+                        PHÂN HỆ #01
+                    </span>
+                    <span id="core-item-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500 text-white shadow-[0_0_10px_#ff2a54] animate-pulse">
+                        MỚI
+                    </span>
+                    <span id="core-item-green-badge" class="hidden px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500 text-slate-950 shadow-[0_0_10px_#10b981]">
+                        ĐỊA PHƯƠNG
+                    </span>
+                </div>
+
+                <!-- Glowing Holographic UG Core Emblem (From 3rd Reference Image) -->
+                <div class="relative flex items-center justify-center my-0.5">
+                    <div class="w-11 h-11 rounded-full border border-cyan-400/60 bg-cyan-950/60 flex items-center justify-center shadow-[0_0_18px_rgba(0,240,255,0.5)]">
+                        <span class="text-base font-black tracking-tighter text-cyan-200 drop-shadow-[0_0_8px_#00f0ff]">IOC</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Selected Module Full Title -->
+            <div class="px-2 z-10 flex-1 flex items-center justify-center">
+                <h2 id="core-item-title" class="text-xs sm:text-sm md:text-[15px] font-bold text-white leading-snug line-clamp-3 drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]">
+                    Giải ngân vốn đầu tư công
+                </h2>
+            </div>
+
+            <!-- Action Trigger Button -->
+            <div class="w-full z-10 flex flex-col items-center gap-1">
+                <button 
+                    id="btn-launch-module"
+                    class="px-4 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 text-slate-950 shadow-[0_0_16px_rgba(255,207,64,0.65)] hover:brightness-110 active:scale-95 transition flex items-center gap-1.5 cursor-pointer"
+                >
+                    <span>MỞ PHÂN HỆ</span>
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </button>
+                <span class="text-[9px] text-cyan-300/70 tracking-widest">[NHẤP CHUỘT / ENTER]</span>
+            </div>
+
+            <!-- Holographic Glowing Rings Base at bottom of Core -->
+            <div class="holo-stage-rings"></div>
+        </div>
+
+    </main>
+
+    <!-- BOTTOM LEFT QUICK JUMP BAR (Mobile & Desktop Convenience) -->
+    <div class="fixed bottom-5 left-8 z-30 hidden md:flex items-center gap-2">
+        <button id="btn-prev" class="px-3 py-1.5 rounded bg-[#06162d]/85 border border-cyan-500/40 text-cyan-300 hover:border-amber-400 hover:text-amber-300 text-xs font-semibold transition flex items-center gap-1">
+            <span>◀</span> <span>TRƯỚC</span>
+        </button>
+        <button id="btn-next" class="px-3 py-1.5 rounded bg-[#06162d]/85 border border-cyan-500/40 text-cyan-300 hover:border-amber-400 hover:text-amber-300 text-xs font-semibold transition flex items-center gap-1">
+            <span>TIẾP</span> <span>▶</span>
+        </button>
+        <button id="btn-open-list" class="ml-2 px-3 py-1.5 rounded bg-[#06162d]/85 border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/20 text-xs font-semibold transition">
+            DANH SÁCH 30 MỤC
+        </button>
+    </div>
+
+    <!-- BOTTOM RIGHT HUD PROMPT (Exact match to 3rd Reference Image) -->
+    <div class="fixed bottom-5 right-8 z-30 flex items-center gap-2.5 text-xs tracking-wider text-cyan-200/80 font-semibold pointer-events-none">
+        <span>ĐIỀU HƯỚNG / LỰA CHỌN</span>
+        <span class="px-2 py-0.5 rounded border border-cyan-400/50 bg-cyan-950/60 text-amber-300 font-mono text-[11px] shadow-[0_0_10px_rgba(0,240,255,0.2)]">
+            LĂN CHUỘT / CLICK / ⏎
+        </span>
+    </div>
+
+    <!-- MODULE LAUNCH / PREVIEW MODAL (Replaces alert() with futuristic HUD dialog) -->
+    <div id="launch-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-md p-4">
+        <div class="relative w-full max-w-lg rounded-2xl bg-[#06152d] border-2 border-amber-400/70 shadow-[0_0_50px_rgba(255,207,64,0.25)] p-6 text-left overflow-hidden">
+            <div class="flex items-center justify-between border-b border-cyan-500/30 pb-3 mb-4">
+                <div class="flex items-center gap-2">
+                    <span id="modal-id-badge" class="px-2.5 py-1 rounded bg-amber-400 text-slate-950 font-extrabold text-xs">#01</span>
+                    <span id="modal-new-badge" class="hidden px-2 py-0.5 rounded-full bg-rose-500 text-white font-bold text-[10px]">MỚI</span>
+                    <span class="text-xs text-cyan-400 tracking-widest uppercase font-semibold">KẾT NỐI PHÂN HỆ ĐIỀU HÀNH</span>
+                </div>
+                <button id="close-modal" class="text-slate-400 hover:text-white p-1">✕</button>
+            </div>
+
+            <h3 id="modal-title" class="text-lg sm:text-xl font-bold text-white mb-2">
+                Giải ngân vốn đầu tư công
+            </h3>
+            <p id="modal-desc" class="text-xs sm:text-sm text-cyan-200/80 mb-5 leading-relaxed">
+                Hệ thống đang khởi tạo luồng dữ liệu thời gian thực và bảng biểu trực quan cho chuyên đề này.
+            </p>
+
+            <!-- Simulated Live Telemetry Bars -->
+            <div class="grid grid-cols-3 gap-3 mb-6">
+                <div class="bg-[#040d1c] border border-cyan-500/30 rounded-lg p-3">
+                    <div class="text-[10px] text-cyan-400/70 uppercase">TRẠNG THÁI</div>
+                    <div class="text-sm font-bold text-emerald-400 mt-0.5 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping"></span>
+                        TRỰC TUYẾN
+                    </div>
+                </div>
+                <div class="bg-[#040d1c] border border-cyan-500/30 rounded-lg p-3">
+                    <div class="text-[10px] text-cyan-400/70 uppercase">ĐỒNG BỘ IOC</div>
+                    <div class="text-sm font-bold text-amber-300 mt-0.5">100% REALTIME</div>
+                </div>
+                <div class="bg-[#040d1c] border border-cyan-500/30 rounded-lg p-3">
+                    <div class="text-[10px] text-cyan-400/70 uppercase">BẢO MẬT</div>
+                    <div class="text-sm font-bold text-cyan-300 mt-0.5">CẤP ĐỘ 4</div>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button id="modal-cancel" class="px-4 py-2 rounded-lg border border-cyan-500/40 text-cyan-200 hover:bg-cyan-500/10 text-xs font-semibold transition">
+                    QUAY LẠI VÒNG TRÒN
+                </button>
+                <button id="modal-confirm" class="px-5 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 font-bold text-xs shadow-[0_0_15px_rgba(255,207,64,0.5)] hover:brightness-110 transition">
+                    XÁC NHẬN TRUY CẬP ➔
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- QUICK 30-ITEM DIRECTORY DRAWER MODAL -->
+    <div id="list-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 backdrop-blur-md p-4">
+        <div class="w-full max-w-4xl max-h-[82vh] flex flex-col rounded-2xl bg-[#051328] border border-cyan-400/50 shadow-[0_0_40px_rgba(0,240,255,0.2)] overflow-hidden">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-cyan-500/30">
+                <div>
+                    <h3 class="text-base font-bold text-white tracking-wider uppercase">DANH MỤC ĐẦY ĐỦ 30 PHÂN HỆ ĐIỀU HÀNH</h3>
+                    <p class="text-xs text-cyan-300/70">Nhấp vào bất kỳ mục nào để xoay tâm vòng tròn tới phân hệ đó</p>
+                </div>
+                <button id="close-list-modal" class="px-3 py-1 rounded bg-slate-800 text-cyan-200 hover:bg-rose-500 hover:text-white text-xs font-bold transition">ĐÓNG [ESC]</button>
+            </div>
+            <div id="quick-list-grid" class="p-5 overflow-y-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5"></div>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * DANH SÁCH 30 PHÂN HỆ TỪ BẢNG ĐIỀU KHIỂN GỐC
+         * Giữ nguyên số thứ tự 1-30, tên đầy đủ, tên rút gọn hiển thị trên nan quạt và trạng thái "Mới"
+         */
+        const MODULES = [
+            { id: 1, title: "Giải ngân vốn đầu tư công", short: "Giải ngân vốn ĐTC", isNew: false },
+            { id: 2, title: "Chỉ tiêu kinh tế xã hội", short: "Chỉ tiêu KT - XH", isNew: false },
+            { id: 3, title: "Bộ chỉ số 766", short: "Bộ chỉ số 766", isNew: false },
+            { id: 4, title: "Báo cáo từ kết nối của Bộ Tài Chính", short: "Báo cáo Bộ Tài Chính", isNew: true },
+            { id: 5, title: "Thống kê tài sản công sau sáp nhập", short: "Tài sản công sáp nhập", isNew: true },
+            { id: 6, title: "Theo dõi, giám sát thực hiện nhiệm vụ UBND tỉnh", short: "Nhiệm vụ UBND tỉnh", isNew: false },
+            { id: 7, title: "Theo dõi tờ trình UBND tỉnh", short: "Tờ trình UBND tỉnh", isNew: true },
+            { id: 8, title: "Nghị quyết 57 của tỉnh", short: "Nghị quyết 57 tỉnh", isNew: false },
+            { id: 9, title: "Kinh phí Nghị quyết 57", short: "Kinh phí NQ 57", isNew: false },
+            { id: 10, title: "Theo dõi tiến độ thực hiện TBKL của Tỉnh ủy (Thử nghiệm)", short: "Tiến độ TBKL Tỉnh ủy", isNew: true },
+            { id: 11, title: "Nghị quyết, chỉ thị, kết luận Trung ương", short: "NQ, Chỉ thị Trung ương", isNew: false },
+            { id: 12, title: "Theo dõi tiến độ thực hiện Kế hoạch 100 ngày", short: "Kế hoạch 100 ngày", isNew: true },
+            { id: 13, title: "Theo dõi tiến độ thực hiện Kế hoạch 100 ngày (Trung ương)", short: "KH 100 ngày (TW)", isNew: true },
+            { id: 14, title: "Chỉ tiêu Nghị quyết Tỉnh ủy", short: "Chỉ tiêu NQ Tỉnh ủy", isNew: false },
+            { id: 15, title: "Thông tin doanh nghiệp (Thử nghiệm)", short: "Thông tin doanh nghiệp", isNew: false },
+            { id: 16, title: "Tiêu chí nông thôn mới", short: "Tiêu chí nông thôn mới", isNew: false },
+            { id: 17, title: "Điều hành phản ánh, kiến nghị", short: "Điều hành phản ánh", isNew: false },
+            { id: 18, title: "Quản lý văn bản điều hành", short: "Quản lý văn bản ĐH", isNew: false },
+            { id: 19, title: "Phản ánh hiện trường của tỉnh", short: "Phản ánh hiện trường", isNew: false },
+            { id: 20, title: "Hệ thống camera giám sát", short: "Hệ thống camera", isNew: false },
+            { id: 21, title: "Thông tin đơn vị hành chính tỉnh", short: "Đơn vị hành chính tỉnh", isNew: false },
+            { id: 22, title: "Bản đồ nền GIS", short: "Bản đồ nền GIS", isNew: false },
+            { id: 23, title: "Sản phẩm OCOP", short: "Sản phẩm OCOP", isNew: true },
+            { id: 24, title: "Quan trắc môi trường", short: "Quan trắc môi trường", isNew: true },
+            { id: 25, title: "Cổng tra cứu giá cả nông sản", short: "Giá cả nông sản", isNew: true },
+            { id: 26, title: "Đề xuất kiến nghị của doanh nghiệp", short: "Kiến nghị doanh nghiệp", isNew: true },
+            { id: 27, title: "Kết nối doanh nghiệp và chính quyền", short: "Kết nối DN & Chính quyền", isNew: true },
+            { id: 28, title: "Quản lý dự án đầu tư tư nhân (Thử nghiệm)", short: "Dự án đầu tư tư nhân", isNew: true },
+            { id: 29, title: "Số liệu sở ngành", short: "Số liệu sở ngành", isNew: false, isSpecialGreen: true },
+            { id: 30, title: "Số liệu xã phường", short: "Số liệu xã phường", isNew: false, isSpecialGreen: true }
+        ];
+
+        // Trạng thái ứng dụng
+        let selectedIndex = 0; // Mặc định chọn ô #1 ở đỉnh 12h giống hệt ảnh mẫu số 3
+        let viewMode = 'full30'; // 'full30' (30 ô đầy đủ) hoặc 'paged10' (10 ô/trang phóng đại)
+        let currentPage = 0; // 0: 1-10, 1: 11-20, 2: 21-30
+        let filterNewOnly = false;
+        let searchQuery = '';
+        let soundEnabled = true;
+
+        // Web Audio API Synthesizer cho hiệu ứng âm thanh chọn vũ khí Sci-Fi
+        let audioCtx = null;
+        function playHudSound(type = 'tick') {
+            if (!soundEnabled) return;
+            try {
+                if (!audioCtx) {
+                    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (audioCtx.state === 'suspended') {
+                    audioCtx.resume();
+                }
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                const now = audioCtx.currentTime;
+                if (type === 'tick') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(980, now);
+                    osc.frequency.exponentialRampToValueAtTime(1480, now + 0.035);
+                    gain.gain.setValueAtTime(0.045, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+                    osc.start(now);
+                    osc.stop(now + 0.045);
+                } else if (type === 'confirm') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(520, now);
+                    osc.frequency.exponentialRampToValueAtTime(1240, now + 0.16);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+                    osc.start(now);
+                    osc.stop(now + 0.19);
+                }
+            } catch (e) {
+                // Bỏ qua nếu trình duyệt chặn autoplay audio
+            }
+        }
+
+        // Hàm toán học chuyển đổi tọa độ cực sang Descartes (0 độ ở hướng 12 giờ)
+        function polarToCartesian(cx, cy, r, angleDeg) {
+            const angleRad = ((angleDeg - 90) * Math.PI) / 180.0;
+            return {
+                x: cx + r * Math.cos(angleRad),
+                y: cy + r * Math.sin(angleRad)
+            };
+        }
+
+        // Tạo đường path SVG hình nan quạt (annular sector)
+        function createWedgePath(cx, cy, rInner, rOuter, startAngle, endAngle) {
+            const p1 = polarToCartesian(cx, cy, rOuter, endAngle);
+            const p2 = polarToCartesian(cx, cy, rOuter, startAngle);
+            const p3 = polarToCartesian(cx, cy, rInner, startAngle);
+            const p4 = polarToCartesian(cx, cy, rInner, endAngle);
+            const largeArc = endAngle - startAngle <= 180 ? "0" : "1";
+
+            return [
+                "M", p1.x.toFixed(2), p1.y.toFixed(2),
+                "A", rOuter, rOuter, 0, largeArc, 0, p2.x.toFixed(2), p2.y.toFixed(2),
+                "L", p3.x.toFixed(2), p3.y.toFixed(2),
+                "A", rInner, rInner, 0, largeArc, 1, p4.x.toFixed(2), p4.y.toFixed(2),
+                "Z"
+            ].join(" ");
+        }
+
+        // Vẽ toàn bộ vòng tròn SVG
+        function renderWheel() {
+            const container = document.getElementById('wedges-container');
+            container.innerHTML = '';
+
+            const cx = 500, cy = 500;
+            const rInner = 176;
+            const rOuter = 424;
+
+            // Lấy danh sách mục hiển thị theo chế độ
+            const visibleItems = viewMode === 'full30'
+                ? MODULES
+                : MODULES.slice(currentPage * 10, (currentPage + 1) * 10);
+
+            const totalSlices = visibleItems.length;
+            const sliceAngle = 360 / totalSlices;
+            const gapAngle = viewMode === 'full30' ? 0.55 : 1.1; // Khe hở mảnh giữa các ô
+
+            visibleItems.forEach((item, localIdx) => {
+                const globalIdx = MODULES.findIndex(m => m.id === item.id);
+                // Ô đầu tiên (index 0) nằm chính giữa hướng 12 giờ (0 độ) giống hệt ảnh mẫu số 3
+                const centerAngle = localIdx * sliceAngle;
+                const startAngle = centerAngle - sliceAngle / 2 + gapAngle / 2;
+                const endAngle = centerAngle + sliceAngle / 2 - gapAngle / 2;
+
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.setAttribute("class", `wedge-group ${item.isSpecialGreen ? 'special-green' : ''} ${globalIdx === selectedIndex ? 'active' : ''}`);
+                g.setAttribute("data-index", globalIdx);
+
+                // Kiểm tra bộ lọc tìm kiếm hoặc lọc "Mới"
+                const matchesSearch = !searchQuery || 
+                    item.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    String(item.id) === searchQuery.trim();
+                const matchesNew = !filterNewOnly || item.isNew;
+
+                if (!matchesSearch || !matchesNew) {
+                    g.classList.add('dimmed');
+                }
+
+                // 1. Hình quạt của từng phân hệ
+                const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                path.setAttribute("class", "wedge-path");
+                path.setAttribute("d", createWedgePath(cx, cy, rInner, rOuter, startAngle, endAngle));
+                g.appendChild(path);
+
+                // 2. Số thứ tự ở vành ngoài (1 .. 30)
+                const numPos = polarToCartesian(cx, cy, rOuter - 20, centerAngle);
+                const numText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                numText.setAttribute("x", numPos.x.toFixed(2));
+                numText.setAttribute("y", numPos.y.toFixed(2));
+                numText.setAttribute("text-anchor", "middle");
+                numText.setAttribute("dominant-baseline", "central");
+                numText.setAttribute("class", "wedge-num");
+                numText.textContent = item.id;
+                g.appendChild(numText);
+
+                // 3. Nhãn tên phân hệ xoay theo hướng tâm (Radial Text) để không bị ngược chữ
+                const textRadius = (rInner + rOuter) / 2 - 8;
+                const labelPos = polarToCartesian(cx, cy, textRadius, centerAngle);
+                const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                label.setAttribute("x", labelPos.x.toFixed(2));
+                label.setAttribute("y", labelPos.y.toFixed(2));
+                label.setAttribute("text-anchor", "middle");
+                label.setAttribute("dominant-baseline", "central");
+                label.setAttribute("class", "wedge-label");
+                if (viewMode === 'paged10') {
+                    label.style.fontSize = '11.5px';
+                }
+
+                // Xoay chữ hướng tâm dễ đọc ở cả nửa phải và nửa trái vòng tròn
+                const normAngle = ((centerAngle % 360) + 360) % 360;
+                let textRot = normAngle - 90;
+                if (normAngle > 180 && normAngle < 360) {
+                    textRot = normAngle + 90;
+                }
+                label.setAttribute("transform", `rotate(${textRot.toFixed(2)}, ${labelPos.x.toFixed(2)}, ${labelPos.y.toFixed(2)})`);
+                label.textContent = viewMode === 'paged10' ? item.title.slice(0, 32) : item.short;
+                g.appendChild(label);
+
+                // 4. Huy hiệu đỏ "MỚI" phát sáng (Giống hệt ảnh tham chiếu số 3)
+                if (item.isNew) {
+                    const badgePos = polarToCartesian(cx, cy, rOuter - 38, centerAngle + (sliceAngle * 0.24));
+                    const dot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    dot.setAttribute("cx", badgePos.x.toFixed(2));
+                    dot.setAttribute("cy", badgePos.y.toFixed(2));
+                    dot.setAttribute("r", viewMode === 'full30' ? "4.2" : "6");
+                    dot.setAttribute("fill", "#ff2a54");
+                    dot.setAttribute("stroke", "#ffd1dc");
+                    dot.setAttribute("stroke-width", "1");
+                    dot.setAttribute("filter", "url(#redGlow)");
+                    g.appendChild(dot);
+                }
+
+                // 5. Chấm lục bảo cho mục 29 & 30 (Số liệu sở ngành / xã phường)
+                if (item.isSpecialGreen) {
+                    const greenPos = polarToCartesian(cx, cy, rOuter - 38, centerAngle + (sliceAngle * 0.24));
+                    const gDot = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+                    gDot.setAttribute("cx", greenPos.x.toFixed(2));
+                    gDot.setAttribute("cy", greenPos.y.toFixed(2));
+                    gDot.setAttribute("r", "4.2");
+                    gDot.setAttribute("fill", "#10b981");
+                    gDot.setAttribute("stroke", "#a7f3d0");
+                    gDot.setAttribute("stroke-width", "1");
+                    g.appendChild(gDot);
+                }
+
+                // Sự kiện chuột & cảm ứng
+                g.addEventListener('mouseenter', () => {
+                    if (selectedIndex !== globalIdx) {
+                        selectModule(globalIdx, true);
+                    }
+                });
+
+                g.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    selectModule(globalIdx, false);
+                    openModuleModal(MODULES[globalIdx]);
+                });
+
+                container.appendChild(g);
+            });
+
+            updateActiveVisuals();
+        }
+
+        // Cập nhật trạng thái ô đang được chọn & lõi Hologram trung tâm
+        function selectModule(index, playTick = true) {
+            selectedIndex = (index + MODULES.length) % MODULES.length;
+
+            // Nếu đang ở chế độ 10 ô/trang, tự động chuyển trang tương ứng
+            const targetPage = Math.floor(selectedIndex / 10);
+            if (viewMode === 'paged10' && targetPage !== currentPage) {
+                currentPage = targetPage;
+                updatePageButtons();
+                renderWheel();
+            } else {
+                updateActiveVisuals();
+            }
+
+            if (playTick) {
+                playHudSound('tick');
+            }
+        }
+
+        function updateActiveVisuals() {
+            const item = MODULES[selectedIndex];
+
+            // Highlight nan quạt tương ứng
+            document.querySelectorAll('.wedge-group').forEach(el => {
+                const idx = parseInt(el.getAttribute('data-index'), 10);
+                el.classList.toggle('active', idx === selectedIndex);
+            });
+
+            // Tính góc của mũi tên vàng chỉ hướng ở vòng trong
+            const totalSlices = viewMode === 'full30' ? 30 : 10;
+            const localIdx = viewMode === 'full30' ? selectedIndex : (selectedIndex % 10);
+            const sliceAngle = 360 / totalSlices;
+            const angle = localIdx * sliceAngle;
+
+            const pointer = document.getElementById('selection-pointer');
+            pointer.setAttribute('transform', `rotate(${angle.toFixed(2)}, 500, 500)`);
+
+            // Cập nhật thông tin trong lõi Hologram trung tâm
+            const numFormatted = String(item.id).padStart(2, '0');
+            document.getElementById('core-item-number').textContent = `PHÂN HỆ #${numFormatted}`;
+            document.getElementById('core-item-title').textContent = item.title;
+
+            const newBadge = document.getElementById('core-item-badge');
+            newBadge.classList.toggle('hidden', !item.isNew);
+
+            const greenBadge = document.getElementById('core-item-green-badge');
+            greenBadge.classList.toggle('hidden', !item.isSpecialGreen);
+
+            // Cập nhật Telemetry bên trái
+            document.getElementById('side-slot-code').textContent = `SLOT #${numFormatted} / 30`;
+            document.getElementById('side-angle-readout').textContent = `GÓC QUÉT: ${angle.toFixed(1).padStart(5, '0')}°`;
+        }
+
+        // Mở hộp thoại chi tiết phân hệ khi nhấn chọn
+        function openModuleModal(item) {
+            playHudSound('confirm');
+            const modal = document.getElementById('launch-modal');
+            document.getElementById('modal-id-badge').textContent = `#${String(item.id).padStart(2, '0')}`;
+            document.getElementById('modal-title').textContent = item.title;
+            document.getElementById('modal-new-badge').classList.toggle('hidden', !item.isNew);
+            document.getElementById('modal-desc').textContent = 
+                `Đang kết nối trực tiếp tới phân hệ "${item.title}" trên Hệ thống Trung tâm Điều hành Thông minh (IOC). Dữ liệu được cập nhật theo thời gian thực.`;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModuleModal() {
+            const modal = document.getElementById('launch-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Xây dựng danh sách 30 mục trong Drawer Modal
+        function renderQuickList() {
+            const grid = document.getElementById('quick-list-grid');
+            grid.innerHTML = '';
+            MODULES.forEach((item, idx) => {
+                const btn = document.createElement('button');
+                btn.className = `flex items-center justify-between p-3 rounded-xl border text-left transition ${
+                    idx === selectedIndex 
+                        ? 'bg-amber-400/20 border-amber-400 text-white' 
+                        : 'bg-[#081b36]/80 border-cyan-500/25 text-cyan-100 hover:border-cyan-400'
+                }`;
+                btn.innerHTML = `
+                    <div class="flex items-center gap-2.5 pr-2">
+                        <span class="w-7 h-7 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 ${
+                            item.isSpecialGreen ? 'bg-emerald-600 text-white' : 'bg-blue-600 text-white'
+                        }">${item.id}</span>
+                        <span class="text-xs font-medium leading-snug">${item.title}</span>
+                    </div>
+                    ${item.isNew ? '<span class="px-1.5 py-0.5 rounded-full bg-rose-500 text-[9px] font-bold text-white shrink-0">MỚI</span>' : ''}
+                `;
+                btn.addEventListener('click', () => {
+                    selectModule(idx, true);
+                    document.getElementById('list-modal').classList.add('hidden');
+                    document.getElementById('list-modal').classList.remove('flex');
+                });
+                grid.appendChild(btn);
+            });
+        }
+
+        function updatePageButtons() {
+            document.querySelectorAll('.page-btn').forEach(btn => {
+                const p = parseInt(btn.getAttribute('data-page'), 10);
+                if (p === currentPage) {
+                    btn.className = 'page-btn px-2.5 py-1.5 rounded text-xs font-semibold bg-amber-400 text-slate-950 text-left transition';
+                } else {
+                    btn.className = 'page-btn px-2.5 py-1.5 rounded text-xs font-semibold bg-slate-800/80 text-cyan-200 hover:bg-cyan-500/20 text-left transition';
+                }
+            });
+        }
+
+        // Khởi tạo hạt ánh sáng Sci-Fi trôi nổi phía sau giống ảnh số 3
+        function initParticles() {
+            const canvas = document.getElementById('particle-canvas');
+            const ctx = canvas.getContext('2d');
+            let width = canvas.width = window.innerWidth;
+            let height = canvas.height = window.innerHeight;
+
+            window.addEventListener('resize', () => {
+                width = canvas.width = window.innerWidth;
+                height = canvas.height = window.innerHeight;
+            });
+
+            const particles = Array.from({ length: 65 }, () => ({
+                x: Math.random() * width,
+                y: Math.random() * height,
+                r: Math.random() * 2 + 0.6,
+                vx: (Math.random() - 0.5) * 0.35,
+                vy: (Math.random() - 0.5) * 0.35,
+                alpha: Math.random() * 0.65 + 0.2,
+                color: Math.random() > 0.15 ? '#00f0ff' : '#ffcf40'
+            }));
+
+            function animateParticles() {
+                ctx.clearRect(0, 0, width, height);
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    if (p.x < 0) p.x = width;
+                    if (p.x > width) p.x = 0;
+                    if (p.y < 0) p.y = height;
+                    if (p.y > height) p.y = 0;
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.alpha;
+                    ctx.shadowBlur = 10;
+                    ctx.shadowColor = p.color;
+                    ctx.fill();
+                });
+                requestAnimationFrame(animateParticles);
+            }
+            animateParticles();
+        }
+
+        // Gắn kết toàn bộ sự kiện điều khiển (Lăn chuột, phím mũi tên, tìm kiếm, nút chức năng)
+        window.onload = function () {
+            renderWheel();
+            initParticles();
+
+            // Lăn chuột để xoay chọn ô như chọn súng trong game FPS
+            window.addEventListener('wheel', (e) => {
+                if (!document.getElementById('list-modal').classList.contains('hidden')) return;
+                const dir = e.deltaY > 0 ? 1 : -1;
+                selectModule(selectedIndex + dir, true);
+            }, { passive: true });
+
+            // Phím mũi tên Trái/Phải/Lên/Xuống và Enter
+            window.addEventListener('keydown', (e) => {
+                if (document.activeElement === document.getElementById('search-input')) {
+                    if (e.key === 'Enter') {
+                        document.getElementById('search-input').blur();
+                    }
+                    return;
+                }
+                if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    selectModule(selectedIndex + 1, true);
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    selectModule(selectedIndex - 1, true);
+                } else if (e.key === 'Enter') {
+                    e.preventDefault();
+                    openModuleModal(MODULES[selectedIndex]);
+                } else if (e.key === 'Escape') {
+                    closeModuleModal();
+                    document.getElementById('list-modal').classList.add('hidden');
+                    document.getElementById('list-modal').classList.remove('flex');
+                }
+            });
+
+            // Nút Trước / Tiếp
+            document.getElementById('btn-prev').addEventListener('click', () => selectModule(selectedIndex - 1, true));
+            document.getElementById('btn-next').addEventListener('click', () => selectModule(selectedIndex + 1, true));
+
+            // Nút Mở phân hệ ở tâm vòng tròn
+            document.getElementById('btn-launch-module').addEventListener('click', () => {
+                openModuleModal(MODULES[selectedIndex]);
+            });
+
+            // Đóng Modal
+            document.getElementById('close-modal').addEventListener('click', closeModuleModal);
+            document.getElementById('modal-cancel').addEventListener('click', closeModuleModal);
+            document.getElementById('modal-confirm').addEventListener('click', () => {
+                closeModuleModal();
+            });
+
+            // Nút mở danh sách 30 mục
+            document.getElementById('btn-open-list').addEventListener('click', () => {
+                renderQuickList();
+                const listModal = document.getElementById('list-modal');
+                listModal.classList.remove('hidden');
+                listModal.classList.add('flex');
+            });
+            document.getElementById('close-list-modal').addEventListener('click', () => {
+                const listModal = document.getElementById('list-modal');
+                listModal.classList.add('hidden');
+                listModal.classList.remove('flex');
+            });
+
+            // Tìm kiếm nhanh phân hệ
+            const searchInput = document.getElementById('search-input');
+            const clearBtn = document.getElementById('clear-search');
+            searchInput.addEventListener('input', (e) => {
+                searchQuery = e.target.value;
+                clearBtn.classList.toggle('hidden', !searchQuery);
+
+                // Tự động nhảy tới phân hệ đầu tiên khớp từ khóa
+                if (searchQuery.trim() !== '') {
+                    const matchIdx = MODULES.findIndex(m => 
+                        m.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                        String(m.id) === searchQuery.trim()
+                    );
+                    if (matchIdx !== -1) {
+                        selectedIndex = matchIdx;
+                        currentPage = Math.floor(selectedIndex / 10);
+                        updatePageButtons();
+                    }
+                }
+                renderWheel();
+            });
+
+            clearBtn.addEventListener('click', () => {
+                searchInput.value = '';
+                searchQuery = '';
+                clearBtn.classList.add('hidden');
+                renderWheel();
+            });
+
+            // Nút lọc các mục "MỚI"
+            const btnFilterNew = document.getElementById('btn-filter-new');
+            btnFilterNew.addEventListener('click', () => {
+                filterNewOnly = !filterNewOnly;
+                btnFilterNew.classList.toggle('bg-rose-500', filterNewOnly);
+                btnFilterNew.classList.toggle('text-white', filterNewOnly);
+                if (filterNewOnly && !MODULES[selectedIndex].isNew) {
+                    const firstNew = MODULES.findIndex(m => m.isNew);
+                    if (firstNew !== -1) selectedIndex = firstNew;
+                }
+                renderWheel();
+            });
+
+            // Chuyển đổi giữa Chế độ 30 Ô Chuẩn và Chế độ Phóng đại 10 Ô/Nhóm
+            document.getElementById('btn-view-mode').addEventListener('click', () => {
+                viewMode = viewMode === 'full30' ? 'paged10' : 'full30';
+                document.getElementById('view-mode-label').textContent = 
+                    viewMode === 'full30' ? 'CHẾ ĐỘ: 30 Ô CHUẨN' : 'CHẾ ĐỘ: PHÓNG ĐẠI 10 Ô';
+                const groupSwitcher = document.getElementById('group-switcher');
+                groupSwitcher.classList.toggle('hidden', viewMode === 'full30');
+                groupSwitcher.classList.toggle('flex', viewMode === 'paged10');
+                currentPage = Math.floor(selectedIndex / 10);
+                updatePageButtons();
+                renderWheel();
+            });
+
+            // Nút chuyển nhóm khi ở chế độ 10 ô
+            document.querySelectorAll('.page-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    currentPage = parseInt(btn.getAttribute('data-page'), 10);
+                    selectedIndex = currentPage * 10;
+                    updatePageButtons();
+                    renderWheel();
+                });
+            });
+
+            // Bật / Tắt âm thanh
+            document.getElementById('btn-sound').addEventListener('click', () => {
+                soundEnabled = !soundEnabled;
+                document.getElementById('icon-sound-on').classList.toggle('hidden', !soundEnabled);
+                document.getElementById('icon-sound-off').classList.toggle('hidden', soundEnabled);
+            });
+        };
+    </script>
+</body>
+</html>
